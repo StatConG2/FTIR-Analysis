@@ -100,4 +100,21 @@ for (i in x) {
   z = z +1 
 }
 
+# abs data set
+
+concentration <- df1$...1[!is.na(df$...1)][-1]
+concentration <- c(as.numeric(substring(concentration,1,nchar(concentration)-1)),100,0)
+
+full_df_rep <- tibble(mel.concentration=rep(concentration,each=4),rep=paste0(rep("rep",times=80),rep(1:4,times=20)))
+full_df_rep1 <- c()
+
+for(i in 2:81){
+  rep.data <- full_df3[,i,drop=TRUE] 
+  full_df_rep1 <- rbind(full_df_rep1,rep.data)
+}
+
+colnames(full_df_rep1) <- full_df3$wave_len
+full_df_rep <- full_df_rep %>% cbind(as_tibble(full_df_rep1)) 
+
+write.csv(full_df_rep,"abs.values.csv")
 
