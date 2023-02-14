@@ -1,0 +1,118 @@
+---
+title: "Melamine Concentration Prediction using PLSR"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(MASS)
+library(caret)
+library(readxl)
+library(tidyverse)
+library(dplyr)
+
+# Import Data and data preparation
+specData <- read_excel("abs.values.xlsx")
+
+specData <- specData %>% filter(mel.concentration != 100.00)
+
+testData <- specData %>% filter(rep == "rep4") 
+
+trainData <- specData %>% filter(!...1 %in% testData$...1)
+
+trainData1 <- trainData[, c(-1,-3)]
+trainData2 <- trainData1[, c(1, 2950:3050)]
+
+testData1 <- testData[, c(-1,-3)]
+testData2 <- testData1[, c(1, 2950:3050)]
+
+```
+
+Column {.sidebar data.width=300 .box }
+=====================================
+```{r}
+
+```
+
+Model Details {data-orientation=columns}
+=====
+
+Column {data-width=450}
+------
+
+### Model Description
+
+```{r}
+set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+tuneGrid <- expand.grid(
+  ncomp   = seq(1, 40, by = 1)
+)
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneGrid = tuneGrid
+)
+model
+```
+
+
+column {data-width=450}
+------
+
+### Scree plot
+
+```{r}
+plot(model)
+```
+
+
+Predictions {data-orientation=columns}
+=====
+
+Column {data-width=550}
+------
+
+### Actual Vs. Predictions
+  
+```{r}
+test.features <- subset(testData2, select = -c(1))
+concentration.test <- subset(testData2, select = c(1))
+
+pls_pred.test <- predict(model, newdata = test.features)
+
+# Plot actual vs predictions
+plot(concentration.test$mel.concentration, pls_pred.test,
+     xlab = "Actual Concentration", ylab = "Predicted Concentration")
+abline(lm(pls_pred.test ~ concentration.test$mel.concentration), col = "red")
+
+```
+
+column {data-width=350}
+------
+
+### RMSE
+
+```{r}
+# calculate RMSE
+print(sqrt(mean((pls_pred.test - concentration.test$mel.concentration)^2)))
+```
+
+### R squared
+
+```{r}
+print(cor(concentration.test, pls_pred.test) ^ 2)
+```
+
+
+
