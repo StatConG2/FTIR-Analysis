@@ -1,0 +1,407 @@
+---
+title: "predPLSR"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(MASS)
+library(caret)
+library(tidyverse)
+library(dplyr)
+library(DT)
+library(shiny)
+library(shinydashboard)
+library(Hmisc)
+library(shinyWidgets)
+
+```
+
+
+
+Column {.sidebar data.width=300 .box }
+=====================================
+
+*Data - Upload*
+
+```{r}
+
+options(shiny.maxRequestSize=30*1024^2)
+
+      fileInput("file1", "Choose Train CSV File",
+                      multiple = FALSE,
+                      accept = c("text/csv",
+                               "text/comma-separated-values,text/plain",
+                               ".csv"))
+      
+      fileInput("file2", "Choose Test CSV File",
+                      multiple = FALSE,
+                      accept = c("text/csv",
+                               "text/comma-separated-values,text/plain",
+                               ".csv"))
+      
+      sliderInput("peakRange", "Select the wave number range",  min = 450, max=5500, value = c(3400,3500), step = 100)
+      
+      dfTrain <- reactive({
+        req(input$file1)
+        read_csv(input$file1$datapath)
+      })
+      
+      dfTest <- reactive({
+        req(input$file2)
+        read_csv(input$file2$datapath)
+      })
+      
+      minRange <- reactive({
+        req(input$peakRange[1])
+      })
+      
+       maxRange <- reactive({
+        req(input$peakRange[2])
+      })
+
+
+```
+
+
+
+Model Details {data-orientation=columns}
+=====
+
+Column {data-width=450}
+------
+
+### Model Description
+
+```{r}
+
+renderPrint({
+  
+  trainData <- dfTrain()[dfTrain()$mel.concentration != 100.00, ]
+  trainData1 <- trainData[, c(-1,-3)]
+  trainData2 <- trainData1[, c(1, (minRange()-448):(maxRange()-448))]
+
+  testData1 <- dfTest()[, c(-1,-3)]
+  testData2 <- testData1[, c(1, (minRange()-448):(maxRange()-448))]
+  
+  test.features <- testData2[, c(-1)]
+  concentration.test <- testData2[, c(1)]
+  
+  pls.n <- length(unique(dfTrain()$mel.concentration)) + 5
+  
+  set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneLength = pls.n
+)
+
+# Predictions
+pls_pred.test <- predict(model, newdata = test.features)
+
+model
+
+})
+
+```
+
+
+column {data-width=500}
+------
+
+### Scree plot
+
+```{r}
+renderPlot({
+  
+  trainData <- dfTrain()[dfTrain()$mel.concentration != 100.00, ]
+  trainData1 <- trainData[, c(-1,-3)]
+  trainData2 <- trainData1[, c(1, (minRange()-448):(maxRange()-448))]
+
+  testData1 <- dfTest()[, c(-1,-3)]
+  testData2 <- testData1[, c(1, (minRange()-448):(maxRange()-448))]
+  
+  test.features <- testData2[, c(-1)]
+  concentration.test <- testData2[, c(1)]
+  
+  pls.n <- length(unique(dfTrain()$mel.concentration)) + 5
+  
+  set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneLength = pls.n
+)
+
+# Predictions
+pls_pred.test <- predict(model, newdata = test.features)
+plot(model)
+
+})
+```
+
+Predictions {data-orientation=columns}
+=====
+
+Column {data-width=450}
+------
+
+### RMSE
+
+```{r}
+renderValueBox({
+  
+  trainData <- dfTrain()[dfTrain()$mel.concentration != 100.00, ]
+  trainData1 <- trainData[, c(-1,-3)]
+  trainData2 <- trainData1[, c(1, (minRange()-448):(maxRange()-448))]
+
+  testData1 <- dfTest()[, c(-1,-3)]
+  testData2 <- testData1[, c(1, (minRange()-448):(maxRange()-448))]
+  
+  test.features <- testData2[, c(-1)]
+  concentration.test <- testData2[, c(1)]
+  
+  pls.n <- length(unique(dfTrain()$mel.concentration)) + 5
+  
+  set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneLength = pls.n
+)
+
+# Predictions
+pls_pred.test <- predict(model, newdata = test.features)
+
+# calculate RMSE
+rmse <- round(sqrt(mean((pls_pred.test - concentration.test[,1,drop=TRUE])^2)), digits = 3)
+valueBox(rmse, "RMSE")
+
+})
+
+```
+
+### Actual Vs. Predicted
+  
+```{r}
+renderPlot({
+  
+  trainData <- dfTrain()[dfTrain()$mel.concentration != 100.00, ]
+  trainData1 <- trainData[, c(-1,-3)]
+  trainData2 <- trainData1[, c(1, (minRange()-448):(maxRange()-448))]
+
+  testData1 <- dfTest()[, c(-1,-3)]
+  testData2 <- testData1[, c(1, (minRange()-448):(maxRange()-448))]
+  
+  test.features <- testData2[, c(-1)]
+  concentration.test <- testData2[, c(1)]
+  
+  pls.n <- length(unique(dfTrain()$mel.concentration)) + 5
+  
+  set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneLength = pls.n
+)
+
+# Predictions
+pls_pred.test <- predict(model, newdata = test.features)
+
+df <- data.frame(actual = concentration.test[,1,drop=TRUE], predicted = pls_pred.test)
+
+# Plot actual vs predictions
+ggplot(df,aes(actual, predicted)) +
+  stat_summary(fun.data=mean_cl_normal) + 
+  geom_smooth(method='lm', formula= y~x, color = "red") +
+  labs(x = "Actual Concentration", y = "Predicted Concentration")
+})
+
+
+```
+
+
+column {data-width=400}
+------
+
+### R squared
+
+```{r}
+renderGauge({
+  
+  trainData <- dfTrain()[dfTrain()$mel.concentration != 100.00, ]
+  trainData1 <- trainData[, c(-1,-3)]
+  trainData2 <- trainData1[, c(1, (minRange()-448):(maxRange()-448))]
+
+  testData1 <- dfTest()[, c(-1,-3)]
+  testData2 <- testData1[, c(1, (minRange()-448):(maxRange()-448))]
+  
+  test.features <- testData2[, c(-1)]
+  concentration.test <- testData2[, c(1)]
+  
+  pls.n <- length(unique(dfTrain()$mel.concentration)) + 5
+  
+  set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneLength = pls.n
+)
+
+# Predictions
+pls_pred.test <- predict(model, newdata = test.features)
+
+rsq <- cor(concentration.test, pls_pred.test) ^ 2
+gauge(rsq*100, min = 0, max = 100,
+      gaugeSectors(success = c(70,100),
+                   warning = c(40,69),
+                   danger = c(0,39)))
+
+})
+
+
+renderText({
+  
+  trainData <- dfTrain()[dfTrain()$mel.concentration != 100.00, ]
+  trainData1 <- trainData[, c(-1,-3)]
+  trainData2 <- trainData1[, c(1, (minRange()-448):(maxRange()-448))]
+
+  testData1 <- dfTest()[, c(-1,-3)]
+  testData2 <- testData1[, c(1, (minRange()-448):(maxRange()-448))]
+  
+  test.features <- testData2[, c(-1)]
+  concentration.test <- testData2[, c(1)]
+  
+  pls.n <- length(unique(dfTrain()$mel.concentration)) + 5
+  
+  set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneLength = pls.n
+)
+
+# Predictions
+pls_pred.test <- predict(model, newdata = test.features)
+
+rsq <- cor(concentration.test, pls_pred.test) ^ 2
+
+paste("Model explians", round(rsq*100, digits=3),"% of the total variability of the Melamine concentration.")
+})
+```
+
+### Download Actual and Predicted Concentrations
+
+```{r}
+
+renderDataTable({
+  
+  trainData <- dfTrain()[dfTrain()$mel.concentration != 100.00, ]
+  trainData1 <- trainData[, c(-1,-3)]
+  trainData2 <- trainData1[, c(1, (minRange()-448):(maxRange()-448))]
+
+  testData1 <- dfTest()[, c(-1,-3)]
+  testData2 <- testData1[, c(1, (minRange()-448):(maxRange()-448))]
+  
+  test.features <- testData2[, c(-1)]
+  concentration.test <- testData2[, c(1)]
+  
+  pls.n <- length(unique(dfTrain()$mel.concentration)) + 5
+  
+  set.seed(1)
+
+ctrl <- trainControl(
+  method = "LOOCV",
+  number = 10,
+)
+
+
+
+model <- train(
+  mel.concentration ~ .,
+  data = trainData2,
+  method = 'pls',
+  trControl = ctrl,
+  tuneLength = pls.n
+)
+
+# Predictions
+pls_pred.test <- predict(model, newdata = test.features)
+
+df <- data.frame('actual' = concentration.test[,1,drop=TRUE], 'predicted' = pls_pred.test)
+
+datatable(
+  df, extensions ='Buttons', options = list(
+    dom = 'Bfrtip',
+    buttons = c('copy', 'csv', 'excel', 'pdf', 'print')
+  )
+)
+
+})
+
+```
+
+
+
+
+
+
